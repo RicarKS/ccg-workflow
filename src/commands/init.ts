@@ -320,13 +320,14 @@ export async function init(options: InitOptions = {}): Promise<void> {
         try {
           const { execSync } = await import('node:child_process')
           // Check if already in PATH
-          const currentPath = execSync('powershell -Command "[System.Environment]::GetEnvironmentVariable(\'PATH\', \'User\')"', { encoding: 'utf-8' }).trim()
-
-          if (!currentPath.includes(windowsPath) && !currentPath.includes('.claude\\bin')) {
-            // Add to user PATH
-            execSync(`powershell -Command "[System.Environment]::SetEnvironmentVariable('PATH', '$env:PATH;${windowsPath}', 'User')"`, { stdio: 'pipe' })
-            console.log(`    ${ansis.green('✓')} PATH ${ansis.gray('→ 用户环境变量')}`)
+          const cmd = `
+          $old = [System.Environment]::GetEnvironmentVariable('PATH', 'User');
+          if ($old -notlike '*${windowsPath}*' -and $old -notlike '*.claude\\bin*') {
+            [System.Environment]::SetEnvironmentVariable('PATH', $old + ';${windowsPath}', 'User')
           }
+          `
+          const encoded = Buffer.from(cmd, 'utf16le').toString('base64')
+          execSync(`powershell -NoProfile -EncodedCommand ${encoded}`, {stdio: 'pipe'})
         }
         catch {
           // Silently ignore PATH config errors on Windows
